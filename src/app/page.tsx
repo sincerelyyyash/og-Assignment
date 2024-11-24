@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -29,23 +28,21 @@ const createPost = async (content: string) => {
   return data;
 };
 
-const createReply = async (postId: string, content: string) => {
+const createReply = async (postId: string, content: string): Promise<Comment> => {
   try {
-    const response = await axios.post(`/api/posts/${postId}/comments`, {
-      content,
-    });
+    const response = await axios.post(`/api/posts/${postId}/comments`, { content });
     return response.data;
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error creating reply:", err);
     throw new Error("Failed to create reply");
   }
 };
 
-const fetchComments = async (postId: string) => {
+const fetchComments = async (postId: string): Promise<Comment[]> => {
   try {
     const { data } = await axios.get(`/api/posts/${postId}/comments`);
     return data;
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error fetching comments:", err);
     throw new Error("Failed to fetch comments");
   }
@@ -86,9 +83,9 @@ export default function HomePage() {
     if (!newPostContent.trim()) return;
 
     try {
-      const newPost = await createPost(newPostContent);
-      setNewPostContent(""); // Clear textarea after posting
-      window.location.reload(); // Re-fetch posts after new post is created
+      await createPost(newPostContent);
+      setNewPostContent("");
+      window.location.reload();
     } catch (error) {
       console.error("Error creating post:", error);
     }
@@ -137,4 +134,3 @@ export default function HomePage() {
     </div>
   );
 }
-
