@@ -3,85 +3,150 @@
 import React, { useState } from "react";
 import { useQuery } from "react-query";
 import axios from "axios";
-import Card from "./components/Card";
-import CommentSection from "./components/Comments";
 
 type Post = {
   id: string;
   content: string;
   timestamp: string;
+  parentId: string | null;
+  likes: number;
+  dislikes: number;
 };
 
 type Comment = {
   id: string;
   content: string;
   timestamp: string;
+  postId: string;
 };
 
-const fetchRootPosts = async () => {
-  const { data } = await axios.get("/api/posts/root");
-  return data.posts;
+type PaginatedResponse = {
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  posts: Post[];
 };
 
-const createPost = async (content: string) => {
-  const { data } = await axios.post("/api/posts", { content });
+const fetchRootPosts = async ({ page = 1, pageSize = 10 }): Promise<PaginatedResponse> => {
+  const { data } = await axios.get(`/api/posts/root?page=${page}&page_size=${pageSize}`);
   return data;
 };
 
-const createReply = async (postId: string, content: string): Promise<Comment> => {
-  try {
-    const response = await axios.post(`/api/posts/${postId}/comments`, { content });
-    return response.data;
-  } catch (err) {
-    console.error("Error creating reply:", err);
-    throw new Error("Failed to create reply");
-  }
+const createPost = async (content: string, parentId?: string) => {
+  const { data } = await axios.post("/api/posts", { content, parentId });
+  return data;
 };
 
-const fetchComments = async (postId: string): Promise<Comment[]> => {
-  try {
-    const { data } = await axios.get(`/api/posts/${postId}/comments`);
-    return data;
-  } catch (err) {
-    console.error("Error fetching comments:", err);
-    throw new Error("Failed to fetch comments");
-  }
+const createComment = async (postId: string, content: string) => {
+  const { data } = await axios.post(`/api/posts/${postId}/comments`, { content });
+  return data;
 };
 
-export default function HomePage() {
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+const fetchPostComments = async (postId: string) => {
+  const { data } = await axios.get(`/api/posts/${postId}/comments`);
+  return data;
+};
+const CommentItem = ({ comment }: { comment: Comment }) => {
+  return (
+    <div className="pl-4 border-l border-gray-200 mt-2">
+      <p className="text-gray-700">{comment.content}</p>
+      <p className="text-sm text-gray-500 mb-2">
+        {new Date(comment.timestamp).toLocaleString()}
+      </p>
+    </div>
+  );
+};
+
+const Post = ({ post }: { post: Post }) => {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [newPostContent, setNewPostContent] = useState("");
-
-  const { data: posts = [], isLoading, isError, error } = useQuery("rootPosts", fetchRootPosts);
-
-  const handleReply = async (postId: string, replyContent: string) => {
-    if (replyContent.trim()) {
-      try {
-        const reply = await createReply(postId, replyContent);
-        setComments((prevComments) => [
-          ...prevComments,
-          { id: reply.id, content: reply.content, timestamp: reply.timestamp },
-        ]);
-      } catch (error) {
-        console.error("Failed to post reply:", error);
-      }
-    }
-  };
+  const [showComments, setShowComments] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyContent, setReplyContent] = useState("");
 
   const handleShowComments = async (postId: string) => {
-    setSelectedPostId(postId);
+    if (!showComments) {
+      try {
+        const fetchedComments = await fetchPostComments(postId);
+        setComments(fetchedComments);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+      }
+    }
+    setShowComments(!showComments);
+  };
+
+  const handleReply = async (postId: string, content: string) => {
     try {
-      const data = await fetchComments(postId);
-      setComments(data || []);
+      const newComment = await createComment(postId, content);
+      setComments(prev => [...prev, newComment]);
+      setReplyContent("");
+      setIsReplying(false);
     } catch (error) {
-      console.error("Error fetching comments:", error);
+      console.error("Error creating reply:", error);
     }
   };
+
+  return (
+    <div className="border rounded-md p-4 mb-4">
+      <h2 className="text-xl text-black font-semibold">{post.content}</h2>
+      <p className="text-sm text-gray-500 mb-2">
+        {new Date(post.timestamp).toLocaleString()}
+      </p>
+      <div className="flex space-x-4 mb-2">
+        <button
+          onClick={() => handleShowComments(post.id)}
+          className="text-blue-500"
+        >
+          {showComments ? "Hide Comments" : "Show Comments"}
+        </button>
+        <button
+          onClick={() => setIsReplying(!isReplying)}
+          className="text-blue-500"
+        >
+          Reply
+        </button>
+      </div>
+      {isReplying && (
+        <div className="mt-2">
+          <textarea
+            value={replyContent}
+            onChange={(e) => setReplyContent(e.target.value)}
+            className="w-full p-2 border rounded-md text-black"
+            placeholder="Write a reply..."
+          />
+          <button
+            onClick={() => handleReply(post.id, replyContent)}
+            className="mt-2 px-4 py-1 bg-black text-white rounded-md"
+          >
+            Submit
+          </button>
+        </div>
+      )}
+      {showComments && (
+        <div className="mt-4">
+          {comments.map((comment) => (
+            <CommentItem key={comment.id} comment={comment} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Main Page Component
+export default function HomePage() {
+  const [newPostContent, setNewPostContent] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const { data, isLoading, isError, error } = useQuery(
+    ["rootPosts", currentPage],
+    () => fetchRootPosts({ page: currentPage }),
+    {
+      onError: (err) => console.error("Error fetching posts:", err)
+    }
+  );
 
   const handlePostSubmit = async () => {
     if (!newPostContent.trim()) return;
-
     try {
       await createPost(newPostContent);
       setNewPostContent("");
@@ -111,24 +176,27 @@ export default function HomePage() {
       </div>
 
       {isLoading && <p className="text-black">Loading posts...</p>}
-
-      {isError && <p className="text-black">Error loading posts: {(error as Error).message}</p>}
-
-      {(!isLoading && !isError && posts.length === 0) && <p className="text-black">No posts available.</p>}
-
-      {posts.map((post: Post) => (
-        <Card
-          key={post.id}
-          post={post}
-          onReply={handleReply}
-          onShowComments={() => handleShowComments(post.id)}
-        />
+      {isError && (
+        <p className="text-black">Error loading posts: {(error as Error).message}</p>
+      )}
+      {data?.posts.map((post: Post) => (
+        <Post key={post.id} post={post} />
       ))}
 
-      {selectedPostId && (
-        <div className="mt-6">
-          <h2 className="text-xl font-bold text-black">Comments</h2>
-          <CommentSection comments={comments} />
+      {data && data.totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {Array.from({ length: data.totalPages }, (_, i) => (
+            <button
+              key={i + 1}
+              onClick={() => setCurrentPage(i + 1)}
+              className={`px-3 py-1 rounded ${currentPage === i + 1
+                ? "bg-black text-white"
+                : "bg-gray-200 text-black"
+                }`}
+            >
+              {i + 1}
+            </button>
+          ))}
         </div>
       )}
     </div>
