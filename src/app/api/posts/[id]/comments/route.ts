@@ -1,14 +1,25 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+interface RequestContext {
+  params: {
+    id: string;
+  };
+}
+
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+  req: Request,
+  { params }: RequestContext
+): Promise<NextResponse> {
   try {
+    const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+    }
+
     const post = await prisma.post.findUnique({
       where: { id },
       include: {
@@ -17,6 +28,7 @@ export async function GET(
         },
       },
     });
+
     if (!post) {
       return NextResponse.json({ error: "Post not Found" }, { status: 404 });
     }
@@ -28,29 +40,38 @@ export async function GET(
 }
 
 export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
-  let content;
+  req: Request,
+  { params }: RequestContext
+): Promise<NextResponse> {
   try {
-    const body = await request.json();
-    content = body?.content;
+    const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+    }
+
+    const body = await req.json();
+    const content = body?.content;
+
     if (!content || content.trim() === "") {
       return NextResponse.json({ error: "Content cannot be empty" }, { status: 400 });
     }
+
     const parentPost = await prisma.post.findUnique({
       where: { id },
     });
+
     if (!parentPost) {
       return NextResponse.json({ error: "Parent post or comment not found" }, { status: 404 });
     }
+
     const comment = await prisma.comment.create({
       data: {
         content,
         postId: id,
       },
     });
+
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
     console.error("Error creating comment:", error);
