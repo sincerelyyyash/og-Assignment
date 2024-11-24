@@ -3,15 +3,11 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-type RouteParams = {
-  params: {
-    id: string;
-  };
-  searchParams: { [key: string]: string | string[] | undefined };
-};
-
-export async function GET(req: NextRequest, context: RouteParams) {
-  const { id } = context.params;
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
   try {
     const post = await prisma.post.findUnique({
       where: { id },
@@ -31,11 +27,14 @@ export async function GET(req: NextRequest, context: RouteParams) {
   }
 }
 
-export async function POST(req: NextRequest, context: RouteParams) {
-  const { id } = context.params;
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
   let content;
   try {
-    const body = await req.json();
+    const body = await request.json();
     content = body?.content;
     if (!content || content.trim() === "") {
       return NextResponse.json({ error: "Content cannot be empty" }, { status: 400 });
