@@ -1,101 +1,140 @@
-import Image from "next/image";
 
-export default function Home() {
+"use client";
+
+import React, { useState } from "react";
+import { useQuery } from "react-query";
+import axios from "axios";
+import Card from "./components/Card";
+import CommentSection from "./components/Comments";
+
+type Post = {
+  id: string;
+  content: string;
+  timestamp: string;
+};
+
+type Comment = {
+  id: string;
+  content: string;
+  timestamp: string;
+};
+
+const fetchRootPosts = async () => {
+  const { data } = await axios.get("/api/posts/root");
+  return data.posts;
+};
+
+const createPost = async (content: string) => {
+  const { data } = await axios.post("/api/posts", { content });
+  return data;
+};
+
+const createReply = async (postId: string, content: string) => {
+  try {
+    const response = await axios.post(`/api/posts/${postId}/comments`, {
+      content,
+    });
+    return response.data;
+  } catch (err: any) {
+    console.error("Error creating reply:", err);
+    throw new Error("Failed to create reply");
+  }
+};
+
+const fetchComments = async (postId: string) => {
+  try {
+    const { data } = await axios.get(`/api/posts/${postId}/comments`);
+    return data;
+  } catch (err: any) {
+    console.error("Error fetching comments:", err);
+    throw new Error("Failed to fetch comments");
+  }
+};
+
+export default function HomePage() {
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newPostContent, setNewPostContent] = useState("");
+
+  const { data: posts = [], isLoading, isError, error } = useQuery("rootPosts", fetchRootPosts);
+
+  const handleReply = async (postId: string, replyContent: string) => {
+    if (replyContent.trim()) {
+      try {
+        const reply = await createReply(postId, replyContent);
+        setComments((prevComments) => [
+          ...prevComments,
+          { id: reply.id, content: reply.content, timestamp: reply.timestamp },
+        ]);
+      } catch (error) {
+        console.error("Failed to post reply:", error);
+      }
+    }
+  };
+
+  const handleShowComments = async (postId: string) => {
+    setSelectedPostId(postId);
+    try {
+      const data = await fetchComments(postId);
+      setComments(data || []);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    }
+  };
+
+  const handlePostSubmit = async () => {
+    if (!newPostContent.trim()) return;
+
+    try {
+      const newPost = await createPost(newPostContent);
+      setNewPostContent(""); // Clear textarea after posting
+      window.location.reload(); // Re-fetch posts after new post is created
+    } catch (error) {
+      console.error("Error creating post:", error);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="max-w-4xl mx-auto py-6 bg-white">
+      <h1 className="text-3xl font-bold text-center mb-6 text-black">Posts</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mb-6">
+        <textarea
+          value={newPostContent}
+          onChange={(e) => setNewPostContent(e.target.value)}
+          placeholder="What's on your mind?"
+          className="w-full p-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+        />
+        <button
+          onClick={handlePostSubmit}
+          className="bg-black text-white px-4 py-2 rounded mt-2"
+        >
+          Post
+        </button>
+      </div>
+
+      {isLoading && <p className="text-black">Loading posts...</p>}
+
+      {isError && <p className="text-black">Error loading posts: {(error as Error).message}</p>}
+
+      {(!isLoading && !isError && posts.length === 0) && <p className="text-black">No posts available.</p>}
+
+      {posts.map((post: Post) => (
+        <Card
+          key={post.id}
+          post={post}
+          onReply={handleReply}
+          onShowComments={() => handleShowComments(post.id)}
+        />
+      ))}
+
+      {selectedPostId && (
+        <div className="mt-6">
+          <h2 className="text-xl font-bold text-black">Comments</h2>
+          <CommentSection comments={comments} />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }
+
