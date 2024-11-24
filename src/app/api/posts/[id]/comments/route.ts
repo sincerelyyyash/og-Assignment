@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: RequestContext) {
 export async function POST(req: Request, { params }: RequestContext) {
   const { id } = await params;
   const { content } = await req.json();
-  const parentPost = await prisma.post.findUnique({ where: { id } });
+  // const parentPost = await prisma.post.findUnique({ where: { id } });
   const comment = await prisma.comment.create({
     data: {
       content,
