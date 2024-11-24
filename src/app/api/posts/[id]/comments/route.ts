@@ -1,11 +1,10 @@
-
 import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = await context.params;
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const { id } = params;
   try {
     const post = await prisma.post.findUnique({
       where: { id },
@@ -25,8 +24,8 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
   }
 }
 
-export async function POST(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = await context.params;
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const { id } = params;
   let content;
   try {
     const body = await req.json();
@@ -52,4 +51,3 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
     return NextResponse.json({ error: "Failed to create comment" }, { status: 500 });
   }
 }
-
