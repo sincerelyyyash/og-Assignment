@@ -37,15 +37,18 @@ const createPost = async (content: string, parentId?: string) => {
   return data;
 };
 
+
+const fetchPostComments = async (postId: string) => {
+  const { data } = await axios.get(`/api/posts/comments`, {
+    params: { postId },
+  });
+  return data;
+};
 const createComment = async (postId: string, content: string) => {
-  const { data } = await axios.post(`/api/posts/${postId}/comments`, { content });
+  const { data } = await axios.post(`/api/posts/comments`, { content, postId });
   return data;
 };
 
-const fetchPostComments = async (postId: string) => {
-  const { data } = await axios.get(`/api/posts/${postId}/comments`);
-  return data;
-};
 const CommentItem = ({ comment }: { comment: Comment }) => {
   return (
     <div className="pl-4 border-l border-gray-200 mt-2">
