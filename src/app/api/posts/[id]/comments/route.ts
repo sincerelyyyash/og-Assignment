@@ -1,12 +1,11 @@
 
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
-
+export async function GET(req: NextRequest, context: { params: { id: string } }) {
+  const { id } = await context.params;
   try {
     const post = await prisma.post.findUnique({
       where: { id },
@@ -16,11 +15,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         },
       },
     });
-
     if (!post) {
       return NextResponse.json({ error: "Post not Found" }, { status: 404 });
     }
-
     return NextResponse.json(post.Children || []);
   } catch (error) {
     console.error("Error fetching post comments:", error);
@@ -28,41 +25,27 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-
-
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { id } = params;  // ID of the post or comment being replied to
+export async function POST(req: NextRequest, context: { params: { id: string } }) {
+  const { id } = await context.params;
   let content;
-
   try {
-    // Parse the JSON body
     const body = await req.json();
-
-    // Check if content exists and is not empty
     content = body?.content;
-
     if (!content || content.trim() === "") {
       return NextResponse.json({ error: "Content cannot be empty" }, { status: 400 });
     }
-
-    // Check if the parent post or comment exists
     const parentPost = await prisma.post.findUnique({
       where: { id },
     });
-
     if (!parentPost) {
       return NextResponse.json({ error: "Parent post or comment not found" }, { status: 404 });
     }
-
-    // Create a comment (reply) and link it to the parent post or comment
     const comment = await prisma.comment.create({
       data: {
-        content,       // The content of the reply/comment
-        postId: id,    // Link the comment to the parent post or comment using postId
+        content,
+        postId: id,
       },
     });
-
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
     console.error("Error creating comment:", error);
