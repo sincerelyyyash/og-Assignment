@@ -3,8 +3,15 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+type RouteParams = {
+  params: {
+    id: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
+export async function GET(req: NextRequest, context: RouteParams) {
+  const { id } = context.params;
   try {
     const post = await prisma.post.findUnique({
       where: { id },
@@ -24,8 +31,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function POST(req: NextRequest, context: RouteParams) {
+  const { id } = context.params;
   let content;
   try {
     const body = await req.json();
